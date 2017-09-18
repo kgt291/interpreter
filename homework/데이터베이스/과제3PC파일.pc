@@ -1,0 +1,1400 @@
+/**********헤더 선언**********/
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+EXEC SQL INCLUDE SQLCA.H;
+
+/**********상수 선언**********/
+#define MAX_STRING		 32
+#define INPUT_FILE_NAME	 "input.txt"
+#define OUTPUT_FILE_NAME "output.txt"
+
+
+/**********변수 선언**********/
+FILE *in_fp, *out_fp;
+EXEC SQL BEGIN DECLARE SECTION;
+	/* DB 계정 */
+char username[32];
+char password[32];
+
+	/* 고객 변수 */
+char client_ID	[32];
+char client_Name[32];
+int	 client_Age;
+char client_Sex	[2];
+
+	/* 감독 변수 */
+char director_ID  [32];
+char director_Name[32];
+int	 director_Age;
+char director_Sex [2];
+
+	/* 영화 변수 */
+char movie_ID	[32];
+char movie_Title[32];
+char movie_Date [32];
+char movie_Genre[32];
+float  movie_AvgPoint;
+
+	/* 배우 변수 */
+char actor_ID  [32];
+char actor_Name[32];
+int  actor_Age;
+char actor_Sex [2];
+
+	/* 극장 변수 */
+char theater_ID		[32];
+char theater_Address[32];	
+
+	/* 주별 관객 */
+int audience_Week;
+int audience_Number;
+
+	/* 평가 변수 */
+int eval_Point;
+char eval_Date[32];
+
+	/* 갯수 카운터 */
+int counter;
+EXEC SQL END DECLARE SECTION;
+
+
+/**********함수 선언**********/
+int isAdmin(char *str);	/* str이 admin인지 확인 */
+void killSP(char *str); /* 띄어쓰기가 여러번 넣어진걸 없앤다 */
+
+void doTask();	/* DB업무 수행 */
+void join();	/* 1.1. 회원가입 */
+void login();	/* 1.2. 로그인 */
+void logout();	/* 1.3. 종료 */
+
+void search_Movie();	/* 2.1. 영화 검색 */
+void select_Movie();	/* 2.2. 영화 선택 */
+void info_Director();	/* 2.3. 감독 상세 정보 */
+void info_Actor();		/* 2.4. 배우 상세 정보 */
+void info_Point();		/* 2.5. 평점 상세 정보 */
+void info_Theater();	/* 2.6. 상영 극장 상세 정보 */
+void info_Audience();	/* 2.7. 주별 관객 수 정보 */
+void search_Director();	/* 2.8. 감독 검색 */
+void select_Director();	/* 2.9. 감독 선택 */
+void search_Actor();	/* 2.10. 배우 검색 */
+void select_Actor();	/* 2.11. 배우 선택 */
+void input_Point();		/* 2.12. 평정 입력 */
+void client_Logout();	/* 2.13. 로그아웃 */
+
+void register_Movie();      /* 3.1.  영화 정보 등록 */
+void delete_Movie();        /* 3.2.  영화 정보 삭제 */
+void register_Director();   /* 3.3.  감독 정보 등록 */
+void delete_Director();     /* 3.4.  감독 정보 삭제 */
+void register_Actor();      /* 3.5.  배우 정보 등록 */
+void delete_Actor();        /* 3.6.  배우 정보 삭제 */
+void register_Theater();    /* 3.7.  극장 정보 등록 */
+void delete_Theater();      /* 3.8.  극장 정보 삭제 */
+void register_Direct();     /* 3.9.  연출 정보 등록 */
+void register_Appearance();	/* 3.10. 출연 정보 등록 */
+void register_Screening();	/* 3.11. 상영 정보 등록 */
+void register_Week();		/* 3.12. 주별 관객수 정보 등록 */
+void print_DirectorMovie();	/* 3.13. 각 감독별 연출한 영화 수 출력 */
+void print_TheaterMovie();	/* 3.14. 각 극장별 상영 중인 영화 수 출력 */
+void admin_Logout();		/* 3.15. 로그아웃 */
+
+/**********메인 함수**********/
+int main()
+{
+	/* 오라클 로그인 */
+	strcpy(username, "test");
+	strcpy(password, "abcd");
+
+	/* DB 접속*/
+	EXEC SQL CONNECT :username 
+	IDENTIFIED BY	 :password;
+	
+	/**********테이블 제작**********/
+			/* 고객 테이블 */
+	EXEC SQL CREATE TABLE client
+	(
+		client_ID	char(32), 
+		client_Name char(32), 
+		client_Age	integer,
+		client_Sex	char(2),
+		
+		PRIMARY KEY (client_ID)
+	);
+
+			/* 감독 테이블 */
+	EXEC SQL CREATE TABLE director
+	(
+		director_ID		char(32),
+		director_Name 	char(32),
+		director_Age	integer,
+		director_Sex 	char(2),
+
+		PRIMARY KEY (director_ID)
+	);
+
+			/* 영화 테이블 */
+	EXEC SQL CREATE TABLE movie
+	(
+		movie_ID 		char(32),
+		director_ID		char(32),
+		movie_Title		char(32),
+		movie_Date		date,
+		movie_Genre		char(32),
+		movie_AvgPoint	float,
+
+		PRIMARY KEY (movie_ID),
+		FOREIGN KEY (director_ID) REFERENCES director
+			ON DELETE CASCADE
+	);
+
+			/* 배우 테이블 */
+	EXEC SQL CREATE TABLE actor
+	(
+		actor_ID 	char(32),
+		actor_Name 	char(32),
+		actor_Age 	integer,
+		actor_Sex 	char(2),
+
+		PRIMARY KEY (actor_ID)
+	);
+
+			/* 극장 테이블 */
+	EXEC SQL CREATE TABLE theater
+	(
+		theater_ID	 	char(32),
+		theater_Address	char(32),
+
+		PRIMARY KEY (theater_ID)
+	);
+
+			/* 평점 테이블 */
+	EXEC SQL CREATE TABLE eval
+	(
+		movie_ID 	char(32),
+		client_ID 	char(32),
+		eval_Point	integer,
+		eval_Date	date,
+
+		PRIMARY KEY (movie_ID, client_ID),
+		FOREIGN KEY (movie_ID) REFERENCES movie
+			ON DELETE CASCADE,
+		FOREIGN KEY (client_ID) REFERENCES client
+			ON DELETE CASCADE
+	);
+
+			/* 출연 테이블 */
+	EXEC SQL CREATE TABLE appearance
+	(
+		movie_ID 	char(32),
+		actor_ID 	char(32),
+
+		PRIMARY KEY (movie_ID, actor_ID),
+		FOREIGN KEY (movie_ID) REFERENCES movie
+			ON DELETE CASCADE,
+		FOREIGN KEY (actor_ID) REFERENCES actor
+			ON DELETE CASCADE
+	);
+
+			/* 상영 테이블 */
+	EXEC SQL CREATE TABLE screening
+	(
+		movie_ID 	char(32),
+		theater_ID 	char(32),
+	
+		PRIMARY KEY (movie_ID, theater_ID),
+		FOREIGN KEY (movie_ID) REFERENCES movie
+			ON DELETE CASCADE,
+		FOREIGN KEY (theater_ID) REFERENCES theater
+			ON DELETE CASCADE
+	);
+
+			/* 관객 수 테이블 */
+	EXEC SQL CREATE TABLE audience
+	(
+		movie_ID 		char(32),
+		audience_Week 	integer,
+		audience_Number	integer,
+
+		PRIMARY KEY (movie_ID, audience_Week),
+		FOREIGN KEY (movie_ID) REFERENCES movie
+			ON DELETE CASCADE
+	);
+
+
+	/* 입출력에 사용할 파일 지정  */
+	in_fp = fopen(INPUT_FILE_NAME, "r+");
+	out_fp = fopen(OUTPUT_FILE_NAME, "w+");
+
+	/* DB 관리자 입력 */
+	strcpy(client_ID, "admin");
+	strcpy(client_Name, "NULL");
+	client_Age	= 0;
+	strcpy(client_Sex, "N");
+	EXEC SQL INSERT INTO client (client_ID, client_Name, client_Age, client_Sex)	
+	VALUES (:client_ID, :client_Name, :client_Age, :client_Sex);
+
+	/* DB업무 수행 */
+	doTask();
+
+	/* DB업무 종료. 테이블들을 전부 없애주자 */
+	EXEC SQL DROP TABLE appearance	PURGE;
+	EXEC SQL DROP TABLE screening	PURGE;
+	EXEC SQL DROP TABLE eval		PURGE;
+	EXEC SQL DROP TABLE audience	PURGE;
+	EXEC SQL DROP TABLE theater		PURGE;
+	EXEC SQL DROP TABLE movie		PURGE;
+	EXEC SQL DROP TABLE actor		PURGE;
+	EXEC SQL DROP TABLE director	PURGE;
+	EXEC SQL DROP TABLE client		PURGE;
+
+	/* 업무가 잘 종료 되었다. 저장하자. */
+	EXEC SQL COMMIT WORK RELEASE;
+	return 0;
+}
+
+/**********DB 업무**********/
+void doTask()
+{
+	/* 메뉴를 고르는 변수 */
+	int menu_1 = 0, menu_2 = 0;
+    
+	/* 종료 메뉴(1.3)이 입력되기 전까지 반복 */
+	while (menu_1 != 1 || menu_2 != 3)
+	{
+		/* 입력파일에서 메뉴 숫자 2개 읽기 */
+		fscanf(in_fp, "%d %d\n", &menu_1, &menu_2);
+    
+		/* 메뉴 구분 및 해당 연산 수행 */
+		switch (menu_1)
+		{
+		case 1:		/* 최초 메뉴 */	
+			switch(menu_2)
+			{
+			case 1:		/* 1.1. 회원가입 */
+      			join();
+				break;
+			case 2:		/* 1.2. 로그인 */
+				login();
+				break;
+			case 3:		/* 1.3. 종료 */
+				logout();
+				break;
+			}
+			break;
+		
+		case 2:		/* 고객 로그인 성공 시 메뉴 */
+			switch(menu_2)
+			{
+			case 1:		/* 2.1. 영화 검색 */
+				search_Movie();
+				break;
+			case 2:		/* 2.2. 영화 선택 */
+				select_Movie();
+				break;
+			case 3:		/* 2.3. 감독 상세 정보 */
+				info_Director();
+				break;
+			case 4:		/* 2.4. 배우 상세 정보 */
+				info_Actor();;
+				break;
+			case 5:		/* 2.5. 평점 상세 정보 */
+				info_Point();
+				break;
+			case 6:		/* 2.6. 상영 극장 상세 정보 */
+				info_Theater();
+				break;
+			case 7:		/* 2.7. 주별 관객 수 정보 */
+				info_Audience();
+				break;
+			case 8:			/* 2.8. 감독 검색 */
+				search_Director();
+				break;
+			case 9:		/* 2.9. 감독 선택 */
+				select_Director();
+				break;
+			case 10:	/* 2.10. 배우 검색 */
+				search_Actor();
+				break;
+			case 11:	/* 2.11. 배우 선택 */
+				select_Actor();	
+				break;
+			case 12:	/* 2.12. 평정 입력 */
+				input_Point();	
+				break;
+			case 13:	/* 2.13. 로그아웃 */
+				client_Logout();
+				break;			
+			}
+			break;
+
+		case 3:		/* 관리자 로그인 성공 시 메뉴 */
+			switch(menu_2)
+			{
+			case 1:		/* 3.1. 영화 정보 등록 */
+			    register_Movie();
+				break;
+			case 2:		/* 3.2. 영화 정보 삭제 */
+				delete_Movie();
+				break;
+			case 3:     /* 3.3. 감독 정보 등록 */
+                register_Director();
+                break;
+            case 4:     /* 3.4. 감독 정보 삭제 */
+                delete_Director();
+                break;
+            case 5:     /* 3.5. 배우 정보 등록 */
+                register_Actor();
+                break;
+            case 6:     /* 3.6. 배우 정보 삭제 */
+                delete_Actor();
+                break;
+            case 7:     /* 3.7. 극장 정보 등록 */
+                register_Theater();
+                break;
+            case 8:     /* 3.8. 극장 정보 삭제 */
+                delete_Theater();
+                break;
+            case 9:     /* 3.9. 연출 정보 등록 */
+                register_Direct();
+                break;
+			case 10:	/* 3.10. 출연 정보 등록 */
+				register_Appearance();
+				break;
+			case 11:	/* 3.11. 상영 정보 등록 */
+				register_Screening();	
+				break;
+			case 12:	/* 3.12. 주별 관객수 정보 등록 */
+				register_Week();
+				break;
+			case 13:	/* 3.13. 각 감독별 연출한 영화 수 출력 */
+				print_DirectorMovie();	
+				break;
+			case 14:	/* 3.14. 각 극장별 상영 중인 영화 수 출력 */
+				print_TheaterMovie();
+				break;
+			case 15:	/* 3.15. 로그아웃 */
+				admin_Logout();	
+				break;
+			}
+			break;
+		}
+		/* 하나의 작업 종료. 다시 루프 */
+	}
+	/* DB 업무 종료 */
+}
+
+/********** str이 admin인지 확인 **********/
+int isAdmin(char *str)
+{
+	if (str[0] == 'a' && str[1] == 'd' && str[2] == 'm' && str[3] == 'i' && str[4] == 'n')
+		return 0;
+	else
+		return 1;
+}
+
+/********** 띄어쓰기가 여러번 넣어진걸 없앤다 **********/
+void killSP(char *str)
+{
+	int i;
+	for (i=0; i < 31; i++)
+		if (str[i] == '\0')
+			break;
+		else if (str[i] == ' ' && str[i + 1] == ' ')
+			str[i] = '\0';
+}
+
+/********** 1.1. 회원가입 **********/
+void join()
+{
+	/* 파일 입력 */
+	fscanf(in_fp, "%s %s %d %s\n", client_ID, client_Name, &client_Age, client_Sex);
+
+	/* DB 연산 */
+	EXEC SQL INSERT INTO client (client_ID, client_Name, client_Age, client_Sex)	
+	VALUES (:client_ID, :client_Name, :client_Age, :client_Sex);
+
+	/* 파일 출력 */
+	fprintf(out_fp, "1.1. 회원가입\n");
+	killSP(client_ID);
+    killSP(client_Name);
+    killSP(client_Sex);
+	fprintf(out_fp, "> %s %s %d %s\n\n\n", client_ID, client_Name, client_Age, client_Sex);
+}
+
+/********** 1.2. 로그인 **********/
+void login()
+{
+	/* 파일 입력 */
+	fscanf(in_fp, "%s\n", client_ID);
+
+	/* DB 연산 */
+	EXEC SQL SELECT client_ID INTO :client_ID	
+	FROM  client WHERE client_ID = :client_ID;
+
+	/* 파일 출력 */
+	fprintf(out_fp, "1.2. 로그인\n");
+	killSP(client_ID);
+	fprintf(out_fp, "> %s\n\n\n", client_ID);
+}
+
+/********** 1.3. 종료 **********/
+void logout()
+{
+	fprintf(out_fp, "종료\n");
+}
+
+/********** 2.1. 영화 검색 **********/
+void search_Movie()
+{
+	/* 파일 입력 */
+   fscanf(in_fp, "%s", movie_Title);
+   /* DB 연산 */
+
+   /* 파일 출력 */
+   fprintf(out_fp, "2.1. 영화 검색\n");
+   EXEC SQL DECLARE movie_List CURSOR FOR SELECT movie_ID FROM movie WHERE movie_Title = :movie_Title;
+   EXEC SQL OPEN movie_List;
+   for(;;)
+   {
+         EXEC SQL FETCH movie_List
+         INTO :movie_ID;
+
+		    if(sqlca.sqlcode != 0)
+	     if(sqlca.sqlcode != 1403)
+	     {
+			printf("Error Occured : %d\n", sqlca.sqlcode);
+			return;
+	 	 }
+		 else
+			break; /* 에러코드1403번으로break한다. */
+
+		 killSP(movie_ID);
+		 killSP(movie_Title);
+		 fprintf(out_fp, "> %s ", movie_ID);
+		 fprintf(out_fp, "\"%s\" \n", movie_Title);
+   }
+   fprintf(out_fp, "\n\n");
+   EXEC SQL CLOSE movie_List;
+}
+
+/********** 2.2. 영화 선택 **********/
+void select_Movie()
+{
+   int total_audience = 0;
+	/* 파일 입력 */
+   fscanf(in_fp, "%s", movie_ID);
+   EXEC SQL UPDATE movie SET movie_AvgPoint = (SELECT Avg(eval_Point) FROM eval WHERE movie_ID = :movie_ID) WHERE movie_ID = :movie_ID;
+   
+   EXEC SQL SELECT movie_Title, movie_Genre, movie_AvgPoint
+   INTO :movie_Title, :movie_Genre, :movie_AvgPoint
+   FROM movie
+   WHERE movie_ID = :movie_ID;
+
+   /* DB 연산 */
+   EXEC SQL SELECT TO_CHAR(movie_Date,'YYYY-MM-DD') INTO :movie_Date FROM movie WHERE movie_ID = :movie_ID;
+
+   EXEC SQL DECLARE audience_List CURSOR FOR SELECT audience_Number
+   FROM audience WHERE movie_ID = :movie_ID;
+
+   EXEC SQL OPEN  audience_List;
+   for(;;)
+   {
+      EXEC SQL FETCH audience_List
+      INTO :audience_Number;
+	  if(sqlca.sqlcode != 0)
+		if(sqlca.sqlcode != 1403)
+		{
+			printf("Error Occured : %d\n", sqlca.sqlcode);
+			fprintf(out_fp, "2.2. 영화 선택\n");
+			fprintf(out_fp, "> %s %s %s %s %.2f %d\n\n\n", movie_ID, movie_Title, movie_Date, movie_Genre, movie_AvgPoint, total_audience);
+			return;
+		}
+		else
+			break; /* 에러코드1403번으로break한다. */
+	  total_audience += audience_Number;
+   }
+
+   /* 파일 출력 */
+   fprintf(out_fp, "2.2. 영화 선택\n");
+   killSP(movie_ID);
+   killSP(movie_Title);
+   killSP(movie_Date);
+   killSP(movie_Genre);
+   fprintf(out_fp, "> %s ", movie_ID);
+   fprintf(out_fp, "\"%s\" ", movie_Title);
+   fprintf(out_fp, "%s %s %.1f %d\n", movie_Date, movie_Genre, movie_AvgPoint, total_audience);
+   fprintf(out_fp, "\n\n");
+   EXEC SQL CLOSE audience_List;
+}
+
+/********** 2.3. 감독 상세 정보 **********/
+void info_Director()
+{
+	/* 파일 입력 */
+   fscanf(in_fp, "%s", movie_ID);
+
+   EXEC SQL SELECT director_ID
+   INTO :director_ID
+   FROM movie
+   WHERE movie_ID = :movie_ID;
+
+   EXEC SQL SELECT director_Name, director_Age, director_Sex
+   INTO :director_Name, :director_Age, :director_Sex
+   FROM director
+   WHERE director_ID = :director_ID;
+
+   /* DB 연산 */
+   EXEC SQL DECLARE movie_List2 CURSOR FOR SELECT movie_Title 
+   FROM movie WHERE director_ID = :director_ID;
+
+   EXEC SQL OPEN movie_List2;
+
+   /* 파일 출력 */
+   fprintf(out_fp, "2.3. 감독 상세 정보\n");
+   killSP(director_ID);
+   killSP(director_Name);
+   killSP(director_Sex);
+   fprintf(out_fp, "> %s %s %d %s ", director_ID, director_Name, director_Age, director_Sex);
+   for(;;)
+   {
+      EXEC SQL FETCH movie_List2
+      INTO :movie_Title;
+
+	    if(sqlca.sqlcode != 0)
+		if(sqlca.sqlcode != 1403)
+		{
+			printf("Error Occured : %d\n", sqlca.sqlcode);
+			break;
+		}
+		else
+		{			
+		    break; /* 에러코드1403번으로break한다. */
+		}
+
+      killSP(movie_Title);
+      fprintf(out_fp, "\"%s\" ", movie_Title);
+	
+   }
+   fprintf(out_fp, "\n\n\n");
+   EXEC SQL CLOSE movie_List2;
+}
+
+/********** 2.4. 배우 상세 정보 **********/
+void info_Actor()
+{
+	/* 파일 입력 */
+    fscanf(in_fp, "%s", movie_ID);
+
+    /* DB 연산 */
+    EXEC SQL DECLARE appearance_List CURSOR FOR SELECT actor_ID
+    FROM appearance WHERE movie_ID = :movie_ID;
+ 
+    EXEC SQL OPEN appearance_List;
+
+    /* 파일 출력 */
+    fprintf(out_fp, "2.4. 배우 상세 정보\n");
+    for(;;)
+    {
+	  EXEC SQL FETCH appearance_List
+      INTO :actor_ID;
+
+	   if(sqlca.sqlcode != 0)
+		 if(sqlca.sqlcode != 1403)
+		 {
+			printf("Error Occured : %d\n", sqlca.sqlcode);
+			break;
+		 }
+	     else
+		 {
+			break;
+		 }
+
+      EXEC SQL SELECT actor_Name, actor_Age, actor_Sex
+	  INTO :actor_Name, :actor_Age, :actor_Sex
+	  FROM actor
+	  WHERE actor_ID = :actor_ID;
+	  killSP(actor_ID);
+      killSP(actor_Name);
+      killSP(actor_Sex);
+	  fprintf(out_fp, "> %s %s %d %s ", actor_ID, actor_Name, actor_Age, actor_Sex);
+
+	  EXEC SQL DECLARE appearance_List2 CURSOR FOR SELECT movie_ID
+      FROM appearance WHERE actor_ID = :actor_ID;
+
+      EXEC SQL OPEN appearance_List2;
+
+      for(;;)
+	  {
+	     EXEC SQL FETCH appearance_List2
+         INTO :movie_ID;
+		 if(sqlca.sqlcode != 0)
+			if(sqlca.sqlcode != 1403)
+			{
+				printf("Error Occured : %d\n", sqlca.sqlcode);
+				return;
+			}
+			else
+			{
+				break;
+			}
+         EXEC SQL SELECT movie_Title
+	     INTO :movie_Title
+	     FROM movie
+	     WHERE movie_ID = :movie_ID;
+		 killSP(movie_Title);
+         fprintf(out_fp, "\"%s\" ", movie_Title);
+	   }
+	   fprintf(out_fp, "\n");
+    }
+	fprintf(out_fp, "\n\n\n");
+    EXEC SQL CLOSE appearance_List2;
+    EXEC SQL CLOSE appearance_List;
+}
+
+/********** 2.5. 평점 상세 정보 **********/
+void info_Point()
+{
+	/* 파일 입력 */
+   fscanf(in_fp, "%s", movie_ID);
+
+   /* DB 연산 */
+   EXEC SQL DECLARE eval_List CURSOR FOR SELECT client_ID, eval_Point
+   FROM eval WHERE movie_ID = :movie_ID;
+
+   EXEC SQL OPEN eval_List;
+
+   /* 파일 출력 */
+   fprintf(out_fp, "2.5. 평점 상세 정보\n");
+   for(;;)
+   {
+      EXEC SQL FETCH eval_List
+      INTO :client_ID, :eval_Point;
+
+	    if(sqlca.sqlcode != 0)
+	  {
+	  	if(sqlca.sqlcode != 1403)
+		{
+			printf("Error Occured : %d\n", sqlca.sqlcode);
+			EXEC SQL CLOSE eval_List;
+			return;
+		}
+		else
+		{
+			break; /* 에러코드1403번으로break한다. */
+		}
+	  }
+
+	  EXEC SQL SELECT TO_CHAR(eval_Date,'YYYY-MM-DD') INTO :eval_Date FROM eval WHERE movie_ID = :movie_ID AND client_ID = :client_ID;
+      killSP(movie_ID);
+      killSP(client_ID);
+      killSP(eval_Date);
+	  fprintf(out_fp, "> %s %s %d %s\n", movie_ID, client_ID, eval_Point, eval_Date);
+   }
+   fprintf(out_fp, "\n\n");
+   EXEC SQL CLOSE eval_List;
+}
+
+/********** 2.6. 상영 극장 상세 정보 **********/
+void info_Theater()
+{
+	/* 파일 입력 */
+   fscanf(in_fp, "%s", movie_ID);
+
+   /* DB 연산 */
+   EXEC SQL DECLARE screening_List CURSOR FOR SELECT theater_ID
+   FROM screening WHERE movie_ID = :movie_ID;
+
+   EXEC SQL OPEN screening_List;
+
+   /* 파일 출력 */
+   fprintf(out_fp, "2.6. 상영 극장 상세 정보\n");
+   for(;;)
+   {
+	  EXEC SQL FETCH screening_List
+      INTO :theater_ID;
+
+	  	   if(sqlca.sqlcode != 0)
+		if(sqlca.sqlcode != 1403)
+		{
+			printf("Error Occured : %d\n", sqlca.sqlcode);
+			
+						return;
+		}
+		else
+			break; /* 에러코드1403번으로break한다. */
+
+      EXEC SQL SELECT theater_Address
+	  INTO :theater_Address
+	  FROM theater
+	  WHERE theater_ID = :theater_ID;
+
+	  killSP(theater_ID);
+      killSP(theater_Address);
+	  fprintf(out_fp, "> %s ", theater_ID);
+	  fprintf(out_fp, "\"%s\" ", theater_Address);
+
+	  EXEC SQL DECLARE screening_List2 CURSOR FOR SELECT movie_ID
+      FROM screening WHERE theater_ID = :theater_ID;
+
+      EXEC SQL OPEN screening_List2;
+
+      for(;;)
+	  {
+	     EXEC SQL FETCH screening_List2
+         INTO :movie_ID;
+
+		  if(sqlca.sqlcode != 0)
+		if(sqlca.sqlcode != 1403)
+		{
+			printf("Error Occured : %d\n", sqlca.sqlcode);
+			
+			fprintf(out_fp, "\n\n\n");
+			return;
+		}
+		else
+			break; /* 에러코드1403번으로break한다. */
+
+         EXEC SQL SELECT movie_Title
+	     INTO :movie_Title
+	     FROM movie
+	     WHERE movie_ID = :movie_ID;
+		 killSP(movie_Title);
+         fprintf(out_fp, "\"%s\" ", movie_Title);
+      }
+	  fprintf(out_fp, "\n");
+   }
+    fprintf(out_fp, "\n\n\n");
+   EXEC SQL CLOSE screening_List2;
+   EXEC SQL CLOSE screening_List;
+}
+
+/********** 2.7. 주별 관객 수 정보 **********/
+void info_Audience()
+{
+	/* 파일 입력 */
+   fscanf(in_fp, "%s", movie_ID);
+
+   /* DB 연산 */
+   EXEC SQL DECLARE audience_List2 CURSOR FOR SELECT audience_Week, audience_Number 
+   FROM audience WHERE movie_ID = :movie_ID;
+
+   EXEC SQL OPEN audience_List2;
+
+   /* 파일 출력 */
+   fprintf(out_fp, "2.7. 주별 관객 수 정보\n");
+   for(;;)
+   {
+      EXEC SQL FETCH audience_List2
+      INTO :audience_Week, :audience_Number;
+
+	    if(sqlca.sqlcode != 0)
+		if(sqlca.sqlcode != 1403)
+		{
+			printf("Error Occured : %d\n", sqlca.sqlcode);
+			return;
+		}
+		else
+			break; /* 에러코드1403번으로break한다. */
+	  killSP(movie_ID);
+      fprintf(out_fp, "> %s %d %d\n",movie_ID, audience_Week, audience_Number);
+   }
+   fprintf(out_fp, "\n\n");
+   EXEC SQL CLOSE audience_List2;
+}
+
+/********** 2.8. 감독 검색 **********/
+void search_Director()
+{
+	/* 파일 입력 */
+   fscanf(in_fp, "%s", &director_Name);
+
+   /* DB 연산 */
+   EXEC SQL DECLARE director_List CURSOR FOR SELECT director_ID
+   FROM director WHERE director_Name = :director_Name;
+
+   EXEC SQL OPEN director_List;
+
+   /* 파일 출력 */
+   fprintf(out_fp, "2.8. 감독 검색\n");
+   for(;;)
+   {
+      EXEC SQL FETCH director_List
+      INTO :director_ID;
+
+	    if(sqlca.sqlcode != 0)
+		  if(sqlca.sqlcode != 1403)
+		  {
+			  printf("Error Occured : %d\n", sqlca.sqlcode);
+			  return;
+		  }
+		  else
+			  break; /* 에러코드1403번으로break한다. */
+
+	  killSP(director_ID);
+      killSP(director_Name);
+      fprintf(out_fp, "> %s %s\n",director_ID, director_Name);
+	
+   }
+   fprintf(out_fp, "\n\n");
+   EXEC SQL CLOSE audience_List;
+}
+
+/********** 2.9. 감독 선택 **********/
+void select_Director()
+{
+	/* 파일 입력 */
+   fscanf(in_fp, "%s", director_ID);
+
+   EXEC SQL SELECT director_Name, director_Age, director_Sex
+   INTO :director_Name, :director_Age, :director_Sex
+   FROM director
+   WHERE director_ID = :director_ID;
+
+   /* DB 연산 */
+   EXEC SQL DECLARE movie_List3 CURSOR FOR SELECT movie_Title 
+   FROM movie WHERE director_ID = :director_ID;
+
+   EXEC SQL OPEN movie_List3;
+
+   /* 파일 출력 */
+   fprintf(out_fp, "2.9. 감독 선택\n");
+   killSP(director_ID);
+   killSP(director_Name);
+   killSP(director_Sex);
+   fprintf(out_fp, "> %s %s %d %s", director_ID, director_Name, director_Age, director_Sex);
+   for(;;)
+   {
+      EXEC SQL FETCH movie_List3
+      INTO :movie_Title;
+
+	   if(sqlca.sqlcode != 0)
+		if(sqlca.sqlcode != 1403)
+		{
+			printf("Error Occured : %d\n", sqlca.sqlcode);
+			
+			fprintf(out_fp, "\n\n\n");
+			return;
+		}
+		else
+			break; /* 에러코드1403번으로break한다. */
+
+	  killSP(movie_Title);
+	  fprintf(out_fp, " \"%s\"", movie_Title);
+	 
+   }
+   fprintf(out_fp, "\n\n\n");
+   EXEC SQL CLOSE movie_List3;
+}
+
+/********** 2.10. 배우 검색 **********/
+void search_Actor()
+{
+	/* 파일 입력 */
+	fscanf(in_fp, "%s\n", actor_Name);
+
+	/* DB 연산 */
+	EXEC SQL DECLARE actor_List
+	CURSOR FOR SELECT actor_ID
+	FROM actor WHERE actor_Name = :actor_Name;
+
+	/* 파일 출력 */
+	EXEC SQL OPEN actor_List;
+	fprintf(out_fp, "2.10. 배우 검색\n");
+	for(;;)
+	{
+		EXEC SQL FETCH actor_list
+		INTO :actor_ID;
+
+		if(sqlca.sqlcode != 0)
+			if(sqlca.sqlcode != 1403)
+			{
+				printf("Error Occured : %d\n", sqlca.sqlcode);
+				EXEC SQL ROLLBACK RELEASE;
+				return;
+			}
+			else
+				break; /* 에러코드1403번으로break한다. */
+
+		killSP(actor_ID);
+        killSP(actor_Name); 
+		fprintf(out_fp, "> %s %s\n", actor_ID, actor_Name);
+	}
+	fprintf(out_fp, "\n\n");
+	EXEC SQL CLOSE actor_List;
+}
+
+/********** 2.11. 배우 선택 **********/
+void select_Actor()
+{
+	/* 파일 입력 */
+	fscanf(in_fp, "%s\n", actor_ID);
+
+	/* DB 연산 */
+	EXEC SQL SELECT actor_Name, actor_Age, actor_Sex 
+	INTO :actor_Name, :actor_Age, :actor_Sex
+	FROM actor WHERE actor_ID = :actor_ID;
+
+	EXEC SQL DECLARE actor_appear
+	CURSOR FOR SELECT movie_ID
+	FROM appearance WHERE actor_ID = :actor_ID;
+
+	EXEC SQL OPEN actor_appear;
+
+	/* 파일 출력 */
+	fprintf(out_fp, "2.11. 배우 선택\n");
+	killSP(actor_ID);
+    killSP(actor_Name);
+    killSP(actor_Sex);
+	fprintf(out_fp, "> %s %s %d %s ", actor_ID, actor_Name, actor_Age, actor_Sex);
+	for(;;)
+	{
+		EXEC SQL FETCH actor_appear
+		INTO :movie_ID;
+		
+		if(sqlca.sqlcode != 0)
+			if(sqlca.sqlcode != 1403)
+			{
+				printf("Error Occured : %d\n", sqlca.sqlcode);
+				EXEC SQL ROLLBACK RELEASE;
+				return;
+			}
+			else
+				break; /* 에러코드1403번으로break한다. */
+
+		EXEC SQL SELECT movie_Title INTO :movie_Title	
+		FROM movie WHERE movie_ID = :movie_ID;
+		
+        killSP(movie_Title);
+		fprintf(out_fp, "\"%s\" ", movie_Title);
+	}
+	fprintf(out_fp, "\n\n\n");
+	EXEC SQL CLOSE actor_List;
+}
+
+/********** 2.12. 평점 입력 **********/
+void input_Point()
+{
+   /* 파일 입력 */
+   fscanf(in_fp, "%s %d\n", movie_ID, &eval_Point);
+
+   /* DB 연산 */
+   EXEC SQL INSERT INTO eval (movie_ID, client_ID, eval_Point, eval_Date)   
+   VALUES (:movie_ID, :client_ID, :eval_Point, to_date(SYSDATE,'YYYY-MM-DD'));
+
+   /* 파일 출력 */
+   fprintf(out_fp, "2.12. 평점 입력\n");
+   killSP(movie_ID);
+   fprintf(out_fp, "> %s %d\n\n\n", movie_ID, eval_Point);
+}
+
+
+/********** 2.13. 로그아웃 **********/
+void client_Logout()
+{
+	fprintf(out_fp, "2.13. 로그아웃\n");
+	killSP(client_ID);
+	fprintf(out_fp, "> %s\n\n\n", client_ID);
+}
+
+	/********** 3.1. 영화 정보 등록 **********/
+	void register_Movie()
+	{
+	 /* 파일 입력 */
+	 fscanf(in_fp, "%s %s", movie_ID, movie_Title);
+	 fscanf(in_fp, "%s %s\n", movie_Date, movie_Genre);
+
+ 
+	 if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+	 /* DB 연산 */
+	 EXEC SQL INSERT INTO movie (movie_ID, movie_Title, movie_Date, movie_Genre) 
+	 VALUES (:movie_ID, :movie_Title, :movie_Date, :movie_Genre);
+
+	 /* 파일 출력 */
+	 fprintf(out_fp, "3.1. 영화 정보 등록\n");
+	 killSP(movie_ID);
+	 killSP(movie_Title);
+	 killSP(movie_Date);
+	 killSP(movie_Genre);	
+	 fprintf(out_fp, "> %s ", movie_ID);
+	 fprintf(out_fp, "\"%s\" ", movie_Title);
+	 fprintf(out_fp, "%s %s\n\n\n", movie_Date, movie_Genre);
+	}
+
+	/********** 3.2. 영화 정보 삭제 **********/
+	void delete_Movie()
+	{
+ 
+
+	 /* 파일 입력 */
+	 fscanf(in_fp, "%s\n", movie_ID);
+
+ 
+	 if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+	 /* DB 연산 */
+	 EXEC SQL DELETE FROM movie 
+	 WHERE movie_ID = :movie_ID;
+
+	 /* 파일 출력 */
+	 fprintf(out_fp, "3.2. 영화 정보 삭제\n");
+	 killSP(movie_ID);
+	 fprintf(out_fp, "> %s\n\n\n", movie_ID);
+	}
+
+	/********** 3.3. 감독 정보 등록 **********/
+	void register_Director()
+	{
+ 
+	 /* 파일 입력 */
+	 fscanf(in_fp, "%s %s %d %s\n", director_ID, director_Name, &director_Age, director_Sex);
+
+	 if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+	 /* DB 연산 */
+	 EXEC SQL INSERT INTO director (director_ID, director_Name, director_Age, director_Sex) 
+	 VALUES (:director_ID, :director_Name, :director_Age, :director_Sex);
+
+	 /* 파일 출력 */
+	 fprintf(out_fp, "3.3. 감독 정보 등록\n");
+	 killSP(director_ID);
+	 killSP(director_Name);
+	 killSP(director_Sex);
+	 fprintf(out_fp, "> %s %s %d %s\n\n\n", director_ID, director_Name, director_Age, director_Sex);
+
+	}
+
+
+	/********** 3.4. 감독 정보 삭제 **********/
+	void delete_Director()
+	{
+ 
+	 /* 파일 입력 */
+	 fscanf(in_fp, "%s\n", director_ID);
+ 
+	 if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+	 /* DB 연산 */
+	 EXEC SQL DELETE FROM director 
+	 WHERE director_ID = :director_ID;
+
+	 /* 파일 출력 */
+	 fprintf(out_fp, "3.4. 감독 정보 삭제\n");
+	 killSP(director_ID);
+	 fprintf(out_fp, "> %s\n\n\n", director_ID);
+
+	}
+
+	/********** 3.5. 배우 정보 등록 **********/
+	void register_Actor()
+	{
+ 
+	 /* 파일 입력 */
+	 fscanf(in_fp, "%s %s %d %s\n", actor_ID, actor_Name, &actor_Age, actor_Sex);
+
+	 if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+	 /* DB 연산 */
+	 EXEC SQL INSERT INTO actor (actor_ID, actor_Name, actor_Age, actor_Sex) 
+	 VALUES (:actor_ID, :actor_Name, :actor_Age, :actor_Sex);
+
+	 /* 파일 출력 */
+	 fprintf(out_fp, "3.5. 배우 정보 등록\n");
+	 killSP(actor_ID);
+	 killSP(actor_Name);
+	 killSP(actor_Sex);
+	 fprintf(out_fp, "> %s %s %d %s\n\n\n", actor_ID, actor_Name, actor_Age, actor_Sex);
+
+	}
+
+	/********** 3.6. 배우 정보 삭제 **********/
+	void delete_Actor()
+	{
+ 
+	 /* 파일 입력 */
+	 fscanf(in_fp, "%s\n", actor_ID);
+
+	 if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+	 /* DB 연산 */
+	 EXEC SQL DELETE FROM actor 
+	 WHERE actor_ID = :actor_ID;
+
+	 /* 파일 출력 */
+	 fprintf(out_fp, "3.6. 배우 정보 삭제\n");
+	 killSP(actor_ID);
+	 fprintf(out_fp, "> %s\n\n\n", actor_ID);
+
+	}
+
+	/********** 3.7. 극장 정보 등록 **********/
+	void register_Theater()
+	{
+ 
+	 /* 파일 입력 */
+	 fscanf(in_fp, "%s %s", theater_ID, theater_Address);
+
+	 if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+	 /* DB 연산 */
+	 EXEC SQL INSERT INTO theater (theater_ID, theater_Address) 
+	 VALUES (:theater_ID, :theater_Address);
+
+	 /* 파일 출력 */
+	 fprintf(out_fp, "3.7. 극장 정보 등록\n");
+	 killSP(theater_ID);
+	 killSP(theater_Address);
+	 fprintf(out_fp, "> %s ", theater_ID);
+	 fprintf(out_fp, "\"%s\" ", theater_Address);
+	 fprintf(out_fp, "\n\n\n");
+	}
+
+	/********** 3.8. 극장 정보 삭제 **********/
+	void delete_Theater()
+	{
+ 
+	 /* 파일 입력 */
+	 fscanf(in_fp, "%s\n", theater_ID);
+
+	 if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+	 /* DB 연산 */
+	 EXEC SQL DELETE FROM theater 
+	 WHERE theater_ID = :theater_ID;
+
+	 /* 파일 출력 */
+	 fprintf(out_fp, "3.8. 극장 정보 삭제\n");
+	 killSP(theater_ID);
+	 fprintf(out_fp, "> %s\n\n\n", theater_ID);
+
+	}
+
+	/********** 3.9. 연출 정보 등록 *********/
+	void register_Direct()
+	{
+
+	 /* 파일 입력 */
+	 fscanf(in_fp, "%s %s\n", movie_ID, director_ID);
+
+	 if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+	 /* DB 연산 */
+	 EXEC SQL UPDATE movie
+	 SET director_ID = :director_ID
+	 WHERE movie_ID = :movie_ID;
+
+	 /* 파일 출력 */
+	 fprintf(out_fp, "3.9. 연출 정보 등록\n");
+	 killSP(movie_ID);
+	 killSP(director_ID);
+	 fprintf(out_fp, "> %s %s\n\n\n", movie_ID, director_ID);
+
+	}
+
+	/********** 3.10. 출현 정보 등록 **********/
+	void register_Appearance()
+	{
+	
+
+		/* 파일 입력 */
+		fscanf(in_fp, "%s %s\n", movie_ID, actor_ID);
+
+		if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+		/* DB 연산 */
+		EXEC SQL INSERT INTO appearance (movie_ID, actor_ID)	
+		VALUES (:movie_ID, :actor_ID);
+
+		/* 파일 출력 */
+		fprintf(out_fp, "3.10. 출연 정보 등록\n");
+		killSP(movie_ID);
+		killSP(actor_ID);
+		fprintf(out_fp, "> %s %s\n\n\n", movie_ID, actor_ID);
+	}
+
+	/********** 3.11. 상영 정보 등록 **********/
+	void register_Screening()
+	{
+	
+
+		/* 파일 입력 */
+		fscanf(in_fp, "%s %s\n", movie_ID, theater_ID);
+
+		if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+		/* DB 연산 */
+		EXEC SQL INSERT INTO screening (movie_ID, theater_ID)	
+		VALUES (:movie_ID, :theater_ID);
+
+		/* 파일 출력 */
+		fprintf(out_fp, "3.11. 상영 정보 등록\n");
+		killSP(movie_ID);
+		killSP(theater_ID);
+		fprintf(out_fp, "> %s %s\n\n\n", movie_ID, theater_ID);
+	}
+
+	/********** 3.12. 주별 관객수 정보 등록 **********/
+	void register_Week()
+	{
+	
+
+		/* 파일 입력 */
+		fscanf(in_fp, "%s %d %d\n", movie_ID, &audience_Week, &audience_Number);
+
+		if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+		/* DB 연산 */
+		EXEC SQL INSERT INTO audience (movie_ID, audience_Week, audience_Number)	
+		VALUES (:movie_ID, :audience_Week, :audience_Number);
+
+		/* 파일 출력 */
+		fprintf(out_fp, "3.12. 주별 관객수 정보 등록\n");
+		killSP(movie_ID);
+		fprintf(out_fp, "> %s %d %d\n\n\n", movie_ID, audience_Week, audience_Number);
+	}
+
+	/********** 3.13. 각 감독별 연출한 영화 수 출력 **********/
+void print_DirectorMovie()
+{
+	if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+   /* 파일 출력 */
+   fprintf(out_fp, "3.13. 각 감독별 연출한 영화 수 출력\n");
+      
+   /* DB 연산 */
+   EXEC SQL DECLARE director_list3 CURSOR FOR 
+   SELECT director_ID FROM director; 
+        
+   EXEC SQL OPEN director_list3;
+   for(;;)
+   {
+      EXEC SQL FETCH director_list3 INTO :director_ID;
+      if(sqlca.sqlcode != 0)
+         if(sqlca.sqlcode != 1403)
+         {
+            fprintf(out_fp, "> Error Occured : %d\n", sqlca.sqlcode);
+            EXEC SQL ROLLBACK RELEASE;
+            break;
+         }
+         else
+            break; /* 에러코드1403번으로break한다. */
+
+      EXEC SQL SELECT COUNT(*)
+      INTO :counter
+      FROM movie WHERE director_ID = :director_ID;
+      
+      killSP(director_ID);
+      fprintf(out_fp, "> %s %d\n", director_ID, counter);
+   }
+
+   fprintf(out_fp, "\n\n");
+   EXEC SQL CLOSE director_list;
+}
+
+	/********** 3.14. 각 극장별 상영 중인 영화 수 출력 **********/
+	void print_TheaterMovie()
+	{
+		if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+   /* 파일 출력 */
+   fprintf(out_fp, "3.14. 각 극장별 상영 중인 영화 수 출력\n");
+      
+   /* DB 연산 */
+   EXEC SQL DECLARE theater_list7 CURSOR FOR 
+   SELECT theater_ID FROM theater; 
+        
+   EXEC SQL OPEN theater_list7;
+   for(;;)
+   {
+      EXEC SQL FETCH theater_list7 INTO :theater_ID;
+      if(sqlca.sqlcode != 0)
+         if(sqlca.sqlcode != 1403)
+         {
+            fprintf(out_fp, "> Error Occured : %d\n", sqlca.sqlcode);
+            EXEC SQL ROLLBACK RELEASE;
+            break;
+         }
+         else
+            break; /* 에러코드1403번으로break한다. */
+
+      EXEC SQL SELECT COUNT(*)
+      INTO :counter
+      FROM screening WHERE theater_ID = :theater_ID;
+      
+      killSP(theater_ID);
+      fprintf(out_fp, "> %s %d\n", theater_ID, counter);
+   }
+
+   fprintf(out_fp, "\n\n");
+   EXEC SQL CLOSE theater_list7;
+	}
+
+	/********** 3.15. 로그아웃 **********/
+	void admin_Logout()
+	{
+		if ( isAdmin(client_ID) )
+		{
+			fprintf(out_fp, "insufficient privilege\n\n\n");
+			return;
+		}
+
+		fprintf(out_fp, "3.15. 로그아웃\n");
+		killSP(client_ID);
+		fprintf(out_fp, "> %s\n\n\n", client_ID);
+	}
